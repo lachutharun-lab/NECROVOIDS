@@ -44,20 +44,23 @@ tokens.forEach((token, index) => {
   });
 
   const slashCommands = [
-    { name: 'bcva', description: 'Make the bot join your voice channel' },
-    { name: 'bcst', description: 'Start normalized audio playback' },
-    { name: 'bcsp', description: 'Stop audio playback' },
-    { name: 'bclv', description: 'Leave the voice channel' }
+    { name: 'ncva', description: 'Make the bot join your voice channel' },
+    { name: 'ncst', description: 'Start normalized audio playback' },
+    { name: 'ncsp', description: 'Stop audio playback' },
+    { name: 'nclv', description: 'Leave the voice channel' }
   ];
 
   let connection;
   let player;
+  let isJoining = false;
 
   const safeDestroy = (conn) => {
     try {
       if (!conn) return;
       const status = conn.state && conn.state.status;
-      if (status !== VoiceConnectionStatus.Destroyed) conn.destroy();
+      if (status && status !== VoiceConnectionStatus.Destroyed) {
+        conn.destroy();
+      }
     } catch (e) {
       // ignore double-destroy or other race errors
     }
@@ -71,13 +74,23 @@ tokens.forEach((token, index) => {
       return reply('❌ You need **Administrator** permissions to use this command.');
     }
 
-    if (commandName === 'bcva') {
+    if (commandName === 'ncva') {
+      if (isJoining) return reply('Already joining...');
+      
       const vc = member.voice.channel;
       if (!vc) return reply('You need to be in a voice channel first.');
 
+      isJoining = true;
       setTimeout(async () => {
         try {
-          safeDestroy(connection);
+          // Only destroy if connection exists and not destroyed
+          if (connection) {
+            const status = connection.state && connection.state.status;
+            if (status && status !== VoiceConnectionStatus.Destroyed) {
+              connection.destroy();
+            }
+          }
+          
           connection = joinVoiceChannel({
             channelId: vc.id,
             guildId: guild.id,
@@ -90,21 +103,24 @@ tokens.forEach((token, index) => {
         } catch (err) {
           console.error(`[Bot ${botNum}] JOIN ERROR:`, err.message);
           await reply('❌ Failed to join voice channel.');
+        } finally {
+          isJoining = false;
         }
       }, botNum * 200);
 
       return;
     }
 
-    if (commandName === 'bcst') {
+    if (commandName === 'ncst') {
       if (!connection) return reply('Bot is not in a voice channel.');
 
-      const audioPath = path.join(__dirname, 'mega_loud.mp3');
+      const audioPath = path.join(__dirname, 'V.2 DARK BOOGEYMAN 4LUVONTOP.wav');
       if (!fs.existsSync(audioPath)) return reply('Audio file not found.');
 
       setTimeout(() => {
         const resource = createAudioResource(audioPath, {
-          inlineVolume: true
+          inlineVolume: true,
+          inputType: StreamType.Arbitrary
         });
 
         if (resource.volume) {
@@ -120,13 +136,14 @@ tokens.forEach((token, index) => {
       return reply('✅ Started audio playback.');
     }
 
-    if (commandName === 'bcsp') {
+    if (commandName === 'ncsp') {
       if (player) player.stop();
       return reply('✅ Audio stopped.');
     }
 
-    if (commandName === 'bclv') {
+    if (commandName === 'nclv') {
       safeDestroy(connection);
+      connection = null;
       return reply('✅ Left voice channel.');
     }
 
@@ -136,7 +153,7 @@ tokens.forEach((token, index) => {
   client.on('messageCreate', async message => {
     if (message.author.bot) return;
     const content = message.content.trim().toLowerCase();
-    if (!['!bcva', '!bcst', '!bcsp', '!bclv'].includes(content)) return;
+    if (!['!ncva', '!ncst', '!ncsp', '!nclv'].includes(content)) return;
 
     const reply = async text => {
       try {
